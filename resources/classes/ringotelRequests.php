@@ -156,7 +156,7 @@ class RingotelApiFunctions
                     "maxregs" => intval($param['maxregs']),
                     "extvc" => false,
                     "private" => false,
-                    "multitenant" => false,
+                    "multitenant" => isset($param['multitenant']) ? $param['multitenant'] : false,
                     "dtmfmode" => "rfc2833",
                     "regexpires" => $this->default_connection_regexpires, 
                     "codecs" => array(

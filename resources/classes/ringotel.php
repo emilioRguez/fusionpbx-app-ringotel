@@ -42,6 +42,7 @@ class RingotelClass
     public $max_registration;
     public $default_connection_protocol;
     public $organization_default_emailcc;
+    public $outbound_proxy;
 
     function __construct($mode)
     {
@@ -49,6 +50,7 @@ class RingotelClass
         $this->max_registration = isset($_SESSION['ringotel']['max_registration']['text']) ? intval($_SESSION['ringotel']['max_registration']['text']) : 1;
         $this->default_connection_protocol = isset($_SESSION['ringotel']['default_connection_protocol']['text']) ? $_SESSION['ringotel']['default_connection_protocol']['text'] : 'sip-tcp';
         $this->organization_default_emailcc = isset($_SESSION['ringotel']['organization_default_emailcc']['text']) ? $_SESSION['ringotel']['organization_default_emailcc']['text'] : '';
+        $this->outbound_proxy = isset($_SESSION['ringotel']['outbound_proxy']['text']) ? $_SESSION['ringotel']['outbound_proxy']['text'] : '';
         $ringotel_api = $mode !== 'INTEGRATION' ? $_SESSION['ringotel']['ringotel_api']['text'] : $_SESSION['ringotel']['ringotel_integration_api']['text'];
         $this->api = new RingotelApiFunctions($ringotel_api);
         $this->error = new RingotelErrorService();
@@ -171,6 +173,7 @@ class RingotelClass
         $param['name'] = isset($_REQUEST['connection_name']) ? $_REQUEST['connection_name'] : $_SESSION['domain_name'];             # string	Connection name
         $param['address'] = isset($_REQUEST['connection_domain']) ? $_REQUEST['connection_domain'] : $_SESSION['domain_name'];      # string	Domain or IP address
         $param['protocol'] = isset($_REQUEST['protocol']) ? $_REQUEST['protocol'] : $this->default_connection_protocol;
+        $param['multitenant'] = isset($_REQUEST['multitenant']) ? ($_REQUEST['multitenant'] === 'true' || $_REQUEST['multitenant'] === true) : false;
         //main
         $server_output = $this->api->createBranch($param);
         unset($param);
@@ -265,6 +268,10 @@ class RingotelClass
                     "password" => $ext_find['password'],
                     "authname" => $ext_find['extension'],
                 );
+                // Add outbound proxy for multitenant support
+                if (!empty($this->outbound_proxy)) {
+                    $user['httpsproxy'] = $this->outbound_proxy;
+                }
                 if (!empty($item['email'])) {
                     $user['email'] = $item['email'];
                 }

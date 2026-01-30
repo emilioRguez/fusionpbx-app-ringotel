@@ -170,5 +170,13 @@
     $apps[$x]['default_settings'][$y]['default_setting_enabled'] = "true";
     $apps[$x]['default_settings'][$y]['default_setting_description'] = "Set Default Connection Registration Expires";
     $y++;
-    
+    $apps[$x]['default_settings'][$y]['default_setting_uuid'] = "a8b9c0d1-e2f3-4a5b-6c7d-8e9f0a1b2c3d";
+    $apps[$x]['default_settings'][$y]['default_setting_category'] = "ringotel";
+    $apps[$x]['default_settings'][$y]['default_setting_subcategory'] = "outbound_proxy";
+    $apps[$x]['default_settings'][$y]['default_setting_name'] = "text";
+    $apps[$x]['default_settings'][$y]['default_setting_value'] = "";
+    $apps[$x]['default_settings'][$y]['default_setting_enabled'] = "true";
+    $apps[$x]['default_settings'][$y]['default_setting_description'] = "Outbound Proxy FQDN for Multitenant (e.g., sip.example.com)";
+    $y++;
+
 ?>
