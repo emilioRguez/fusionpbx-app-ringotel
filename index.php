@@ -2788,15 +2788,15 @@ echo '</style>';
 		});
 	};
 
-	const getUsersWithUpdateElements = async () => {
+	const getUsersWithUpdateElements = async (orgid = null) => {
 		// Disable Buttons
 		$('#create_connect_button').attr('disabled', true);
 		$('#create_users_button').attr('disabled', true);
 
-		// List of Exist Extension Reset 
+		// List of Exist Extension Reset
 		createListExistExtensions();
-		// get orgid 
-		const orgid = $('#delete_organization').attr('data-account');
+		// Use passed parameter, fallback to DOM for backwards compatibility
+		orgid = orgid || $('#delete_organization').attr('data-account');
 		// GET ALL USERS, PARKS AND EXTENSIONS AND UPDATE THEIR ENTRY SPOTS WITH ELEMENTS
 		const parksUserExtensions = await getUsers(orgid);
 		// console.log('[getUsersWithUpdateElements] ------------> parksUserExtensions', parksUserExtensions);
@@ -3084,12 +3084,12 @@ echo '</style>';
 					});
 
 					// GET ALL USERS, PARKS AND EXTENSIONS AND UPDATE THEIR ENTRY SPOTS WITH ELEMENTS
-					getUsersWithUpdateElements();
+					getUsersWithUpdateElements(orgid);
 				} else {
 					// Still load users/parks even if no connections exist
 					$('#parks_module').fadeIn(300);
 					$('#extension_module').fadeIn(300);
-					getUsersWithUpdateElements();
+					getUsersWithUpdateElements(orgid);
 				}
 
 				// show block with connections
@@ -3118,7 +3118,7 @@ echo '</style>';
 				$('#parks_module').fadeIn(300);
 				$('#extension_module').fadeIn(300);
 				// Still try to load users even if connections failed
-				getUsersWithUpdateElements();
+				getUsersWithUpdateElements(orgid);
 			});
 		}, 300);
 	};
