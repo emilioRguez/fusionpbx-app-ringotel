@@ -2762,15 +2762,27 @@ echo '</style>';
 						// branchid
 					}
 				}).then((response) => {
-					const { result } = JSON.parse(response.replaceAll("\\", ""));
+					let result = [];
+					try {
+						const parsed = JSON.parse(response.replaceAll("\\", ""));
+						result = parsed?.result || [];
+					} catch (e) {
+						console.error('[getUsers] JSON parse error:', e);
+					}
 					// Clear List Of "Create Users" Extensions
-					result.map((ext) => {
+					(result || []).forEach((ext) => {
 						$('#extension_line_' + ext.extension).remove();
 					});
 					if (type !== 'HIDE') {
 						$('#create_users_loading').fadeOut(300);
 					}
-					resolve(result);
+					resolve(result || []);
+				}).catch((error) => {
+					console.error('[getUsers] AJAX error:', error);
+					if (type !== 'HIDE') {
+						$('#create_users_loading').fadeOut(300);
+					}
+					resolve([]); // Resolve with empty array so caller doesn't hang
 				});
 			}, 300);
 		});
@@ -2791,9 +2803,9 @@ echo '</style>';
 
 		// MAP ALL DATA FROM ALL BRANCHES
 		const regexp = /[\+*]/; // Parks param detect
-		const parks = parksUserExtensions.filter((ext) => ext.extension.match(regexp));
-		const users = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
-		const extensions = parksUserExtensions.filter((ext) => (!ext.extension.match(regexp) && ext.status !== 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
+		const parks = (parksUserExtensions || []).filter((ext) => ext.extension.match(regexp));
+		const users = (parksUserExtensions || []).filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
+		const extensions = (parksUserExtensions || []).filter((ext) => (!ext.extension.match(regexp) && ext.status !== 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
 
 		const parks_count = parks?.length;
 		const users_count = users?.length;
