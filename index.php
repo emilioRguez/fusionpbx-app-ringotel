@@ -1348,7 +1348,7 @@ echo '</style>';
 										</div>
 										<div class="multitenant_ec paddingBottomEc">
 											<div style="display:flex;flex-direction:row;align-items: center;height: 25px;padding: 2rem 0px;">
-												<input id="multitenant_ec_${id}" name="noverify_ec" style="transform: scale(1.25);margin: 4px;" type="checkbox" aria-label="Multi-tenant mode" value="${multitenant}">
+												<input id="multitenant_ec_${id}" name="multitenant_ec" style="transform: scale(1.25);margin: 4px;" type="checkbox" aria-label="Multi-tenant mode" ${multitenant ? 'checked' : ''}>
 												<label for="multitenant_ec_${id}" style="text-align: center;height: 25px;-ms-flex-wrap:nowrap;flex-wrap:nowrap;margin: 0.7rem 0.45rem 0.5rem 0.45rem;font-size: 12pt;">Multi-tenant mode</label>
 											</div>
 										</div>
@@ -3030,7 +3030,13 @@ echo '</style>';
 				}
 			}).then(async (response) => {
 				$('.create_connect_loading').fadeOut(300);
-				const { result } = JSON.parse(response.replaceAll("\\", ""));
+				let result = [];
+				try {
+					const parsed = JSON.parse(response.replaceAll("\\", ""));
+					result = parsed?.result || [];
+				} catch (e) {
+					console.error('[getConnections] JSON parse error:', e);
+				}
 				// console.log('[getConnections] result', result);
 
 				// elements of connections
@@ -3067,6 +3073,11 @@ echo '</style>';
 
 					// GET ALL USERS, PARKS AND EXTENSIONS AND UPDATE THEIR ENTRY SPOTS WITH ELEMENTS
 					getUsersWithUpdateElements();
+				} else {
+					// Still load users/parks even if no connections exist
+					$('#parks_module').fadeIn(300);
+					$('#extension_module').fadeIn(300);
+					getUsersWithUpdateElements();
 				}
 
 				// show block with connections
@@ -3087,6 +3098,15 @@ echo '</style>';
 					}
 
 				}, 300);
+			}).catch((error) => {
+				console.error('[getConnections] Error:', error);
+				$('.create_connect_loading').fadeOut(300);
+				$('#create_connect_button').attr('disabled', false);
+				$('.create_connect_text').fadeIn(300);
+				$('#parks_module').fadeIn(300);
+				$('#extension_module').fadeIn(300);
+				// Still try to load users even if connections failed
+				getUsersWithUpdateElements();
 			});
 		}, 300);
 	};
