@@ -612,6 +612,10 @@ class RingotelClass
             "maxregs" =>  intval($_REQUEST['maxregs']),
         );
 
+        if ($provision['multitenant'] && !empty($this->outbound_proxy)) {
+            $provision['httpsproxy'] = $this->outbound_proxy;
+        }
+
         if (isset($_REQUEST['nosrtp'])) {
             $provision['nosrtp'] = $_REQUEST['nosrtp'] == 'true' ? true : false;
         }
