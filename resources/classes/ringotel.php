@@ -613,7 +613,7 @@ class RingotelClass
         );
 
         if ($provision['multitenant'] && !empty($this->outbound_proxy)) {
-            $provision['httpsproxy'] = $this->outbound_proxy;
+            $provision['proxy'] = $this->outbound_proxy;
         }
 
         if (isset($_REQUEST['nosrtp'])) {
