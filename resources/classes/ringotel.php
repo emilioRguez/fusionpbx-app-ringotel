@@ -844,7 +844,10 @@ class RingotelClass
             'orgid' => $_REQUEST['orgid'],
             'name' => isset($_REQUEST['name']) ? $_REQUEST['name'] : $_REQUEST['number'],
             'number' => $_REQUEST['number'],
-            'users' => $_REQUEST['users']
+            'users' => $_REQUEST['users'],
+            'service'        => isset($_POST['service'])        ? $_POST['service']        : 'Bandwidth',
+            'outboundFormat' => isset($_POST['outboundFormat']) ? $_POST['outboundFormat'] : 'e164',
+            'inboundFormat'  => isset($_POST['inboundFormat'])  ? $_POST['inboundFormat']  : 'national',
         );
         //main
         $server_output = $this->api->createSMSTrunk($param);
@@ -853,7 +856,7 @@ class RingotelClass
         echo json_encode($server_output);
     }
 
-    // Update Numbers Configuration 
+    // Update Numbers Configuration
     public function updateSMSTrunk()
     {
         $param = array(
@@ -861,7 +864,10 @@ class RingotelClass
             'id' => $_REQUEST['id'],
             'name' => $_REQUEST['name'],
             'number' => $_REQUEST['number'],
-            'users' => $_REQUEST['users']
+            'users' => $_REQUEST['users'],
+            'service'        => isset($_POST['service'])        ? $_POST['service']        : 'Bandwidth',
+            'outboundFormat' => isset($_POST['outboundFormat']) ? $_POST['outboundFormat'] : 'e164',
+            'inboundFormat'  => isset($_POST['inboundFormat'])  ? $_POST['inboundFormat']  : 'national',
         );
         // main
         $server_output = $this->api->updateSMSTrunk($param);

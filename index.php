@@ -118,6 +118,9 @@ echo '    	<a class="nav-item nav-link" id="nav-integration-tab" style="cursor: 
 echo '				';
 echo '			<h5 class="card-title" style="font-weight: 400;padding: 0.65rem 0rem 0rem 0rem;border-bottom: 1px solid #80808045;">Integration</h5>';
 echo '		</a> ';
+echo '    	<a class="nav-item nav-link" id="nav-phonenumbers-tab" style="cursor: pointer;padding: 0.5rem 1rem 0.5rem 0.2rem;">';
+echo '			<h5 class="card-title" style="font-weight: 400;padding: 0.65rem 0rem 0rem 0rem;border-bottom: 1px solid #80808045;">Phone Numbers</h5>';
+echo '		</a> ';
 echo '  </div> ';
 echo '</nav> ';
 echo '<div class="tab-content" id="nav-tabContent"> ';
@@ -285,6 +288,9 @@ echo '  	<div class="tab-pane show active" id="nav-integration" role="tabpanel" 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+echo '		</div> ';
+echo '  	<div class="tab-pane show active" id="nav-phonenumbers" role="tabpanel" aria-labelledby="nav-phonenumbers-tab" style="margin: 10px 0px;display: none;">';
+echo '			<div id="telnyx_numbers_container" style="margin-top: 16px;"></div>';
 echo '		</div> ';
 echo '</div>';
 
@@ -2223,7 +2229,7 @@ echo '</style>';
 		}));
 	};
 
-	// Get Numbers Configuration
+	// Get Numbers Configuration (Bandwidth only)
 	const getSMSTrunk = (parksUserExtensions) => {
 		// disable Button
 		$('#manageNumbersModal_button').attr('disabled', true);
@@ -2237,10 +2243,11 @@ echo '</style>';
 			success: function (response) {
 				const { result } = JSON.parse(response.replaceAll("\\", ""));
 				// console.log('[getSMSTrunk --------> ', result);
-				if (result?.length > 0) {
+				const bandwidthTrunks = (result || []).filter(item => item.service === 'Bandwidth');
+				if (bandwidthTrunks?.length > 0) {
 					// get List of Users to compare their id's
 					$('#integration_service').css('width', '100%');
-					result.map((item, k) => {
+					bandwidthTrunks.map((item, k) => {
 						const elementSMSTrunk_ = elementSMSTrunk(item, parksUserExtensions);
 						if (k === 0) {
 							$('#integration_service_container').html(elementSMSTrunk_);
@@ -2272,6 +2279,374 @@ echo '</style>';
 			}
 		});
 	}
+
+	// ===========================
+	// TELNYX / PHONE NUMBERS TAB
+	// ===========================
+
+	let telnyxNumbersLoaded = false;
+
+	// Modal HTML for Add Telnyx Number
+	const TelnyxNumbersModalelement = () => {
+		return `
+<div class="modal fade" id="addTelnyxNumberModal" tabindex="-1" role="dialog" aria-labelledby="addTelnyxNumberModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addTelnyxNumberModalLabel">Add Telnyx Number</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Display Name</label>
+          <input type="text" id="telnyx_display_name" class="form-control" placeholder="Friendly name (optional)"/>
+        </div>
+        <div class="form-group">
+          <label>Phone Number (E.164)</label>
+          <input type="text" id="telnyx_phone_number" class="form-control" placeholder="+14155552671"/>
+        </div>
+        <div class="form-group">
+          <label>Assigned Users</label>
+          <select id="telnyx_users" name="telnyx_users" multiple multiselect-hide-x="true" class="form-control" style="height: 120px;overflow:hidden;" placeholder="Who will be sending and receiving SMS"></select>
+        </div>
+        <div class="form-group">
+          <label>Reformat Outbound</label><br/>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="telnyx_outbound_format" id="telnyx_outbound_e164" value="e164" checked/>
+            <label class="form-check-label" for="telnyx_outbound_e164">e164</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="telnyx_outbound_format" id="telnyx_outbound_national" value="national"/>
+            <label class="form-check-label" for="telnyx_outbound_national">national</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Reformat Inbound</label><br/>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="telnyx_inbound_format" id="telnyx_inbound_national" value="national" checked/>
+            <label class="form-check-label" for="telnyx_inbound_national">national</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="telnyx_inbound_format" id="telnyx_inbound_e164" value="e164"/>
+            <label class="form-check-label" for="telnyx_inbound_e164">e164</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" id="telnyx_save_button" class="btn btn-primary" disabled>
+          <span id="telnyx_save_text">Save</span>
+          <span id="telnyx_save_loading" style="display:none;"><span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Saving...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>`;
+	};
+
+	// Header element for Phone Numbers tab
+	const telnyxNumbersHeaderElement = () => {
+		return `
+<div style="display:flex;padding:1rem 0;flex-direction:row;justify-content:space-between;align-items:center;">
+  <h4 class="card-title" style="font-weight:400;padding:0.5rem 0.2rem;margin:0;">Phone Numbers</h4>
+  <button id="add_telnyx_number_button" class="btn btn-outline-primary" data-toggle="modal" data-target="#addTelnyxNumberModal" style="font-size:10pt;">+ Add Number</button>
+</div>
+<div id="telnyx_numbers_list"></div>`;
+	};
+
+	// Card template for a single Telnyx trunk
+	const elementTelnyxTrunk = (data, parksUserExtensions) => {
+		const users_elements = (data?.users || []).map((id) => {
+			const user = (parksUserExtensions || []).filter((item) => item.id === id)[0];
+			return user
+				? `<div data-id="${user.id}" style="background:#a1a1a1;padding:0px 10px;font-size:11pt;border-radius:10px;color:white;margin:5px 7px;">${user.name} (${user.extension})</div>`
+				: '';
+		}).join('');
+
+		return `<div id="telnyx_trunk_${data.id}" class="card mb-3" style="height:232px;max-width:100%;margin:10px 0px;box-shadow:rgba(0,0,0,0.1) 0px 4px 6px -1px,rgba(0,0,0,0.06) 0px 2px 4px -1px;">
+  <div class="row no-gutters">
+    <div class="col-md-5">
+      <div class="card-body card-body-p">
+        <h5 id="telnyx_trunk_name_h5_${data.id}" class="card-title" style="font-size:20pt;font-weight:700;">${data?.name || '-'}</h5>
+        <input id="telnyx_trunk_name_input_${data.id}" class="card-title" style="font-size:20pt;font-weight:700;display:none;margin:0;padding:0px 10px;line-height:normal;border-radius:10px;border:1px solid #8080804f;" value="${data?.name || ''}"/>
+        <table id="telnyx_trunk_table_${data.id}" data-id="${data.id}" class="table table-hover table-borderless" style="margin-bottom:1rem;">
+          <tbody>
+            <tr>
+              <td style="font-size:12pt;padding:0.25rem 0.75rem;">Number:</td>
+              <td id="telnyx_trunk_number_td_${data.id}" style="font-size:12pt;width:140px;padding:0.25rem 0.75rem;">${data?.number || '-'}</td>
+            </tr>
+            <tr>
+              <td style="font-size:12pt;padding:0.25rem 0.75rem;">Service:</td>
+              <td style="font-size:12pt;width:140px;padding:0.25rem 0.75rem;">${data?.service || 'Telnyx'}</td>
+            </tr>
+            <tr>
+              <td style="font-size:12pt;padding:0.25rem 0.75rem;">Reformat outbound:</td>
+              <td style="font-size:12pt;width:140px;padding:0.25rem 0.75rem;">${data?.outboundFormat || '-'}</td>
+            </tr>
+            <tr>
+              <td style="font-size:12pt;padding:0.25rem 0.75rem;">Reformat inbound:</td>
+              <td style="font-size:12pt;width:140px;padding:0.25rem 0.75rem;">${data?.inboundFormat || '-'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card-body card-body-p">
+        <h5 class="card-title">Users</h5>
+        <div id="telnyx_trunk_users_${data.id}" class="telnyx_trunk_users" data-id="${data.id}" style="display:flex;flex-wrap:wrap;">${users_elements}</div>
+        <select id="telnyx_trunk_manage_users_${data.id}" style="height:125px;overflow:hidden;display:none;" name="telnyx_trunk_manage_users" multiple multiselect-hide-x="true" class="form-control" placeholder="Who will be sending and receiving SMS via this phone number"></select>
+      </div>
+    </div>
+  </div>
+  <button id="telnyx_trunk_save_${data.id}" class="btn btn-outline-primary telnyx_trunk_save" data-id="${data.id}" style="border:0px;padding:2px 10px;margin:10px;align-items:center;display:none;position:absolute;bottom:10px;right:130px;font-size:10pt;font-weight:600;">Save</button>
+  <button id="telnyx_trunk_close_updating_${data.id}" class="btn btn-outline-primary telnyx_trunk_close_updating" data-id="${data.id}" style="display:none;border:0px;padding:2px 10px;margin:10px;align-items:center;position:absolute;bottom:10px;right:40px;font-size:10pt;font-weight:600;color:gray;">Close</button>
+  <span id="telnyx_trunk_save_loading_${data.id}" style="border:0px;padding:2px 10px;margin:10px;align-items:center;display:none;position:absolute;bottom:10px;right:100px;font-size:10pt;font-weight:600;"><span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Loading...</span>
+  <button id="telnyx_trunk_update_${data.id}" class="btn btn-outline-secondary telnyx_trunk_update" data-id="${data.id}" style="border:0px;padding:2px 10px;margin:10px;align-items:center;display:flex;position:absolute;bottom:10px;right:100px;font-size:10pt;font-weight:600;">Edit</button>
+  <button id="telnyx_trunk_delete_${data.id}" class="btn btn-outline-danger telnyx_trunk_delete" data-id="${data.id}" style="border:0px;padding:2px 10px;margin:10px;align-items:center;display:flex;position:absolute;bottom:10px;right:10px;font-size:10pt;font-weight:600;">Delete</button>
+</div>`;
+	};
+
+	// Get Telnyx trunks (filters getSMSTrunk result to Telnyx)
+	const getTelnyxNumbers = (parksUserExtensions) => {
+		const orgid = $('#delete_organization').attr('data-account');
+		$.ajax({
+			url: "/app/ringotel/service.php?method=getSMSTrunk",
+			type: "post",
+			cache: true,
+			data: { orgid },
+			success: function (response) {
+				const { result } = JSON.parse(response.replaceAll("\\", ""));
+				const telnyxTrunks = (result || []).filter(item => item.service === 'Telnyx');
+				if (telnyxTrunks.length > 0) {
+					telnyxTrunks.forEach((item, k) => {
+						const el = elementTelnyxTrunk(item, parksUserExtensions);
+						if (k === 0) {
+							$('#telnyx_numbers_list').html(el);
+						} else {
+							$('#telnyx_numbers_list').append(el);
+						}
+					});
+				} else {
+					$('#telnyx_numbers_list').html('<p style="color:#999;margin-top:1rem;">No Telnyx numbers configured yet.</p>');
+				}
+				const regexp = /[\+*]/;
+				const users = (parksUserExtensions || []).filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
+				eventTelnyxTrunkDelete();
+				eventTelnyxTrunkUpdate(users);
+				eventTelnyxTrunkSave();
+				eventTelnyxTrunkClose();
+			},
+			error: function (jqXHR, textStatus, errorThrown) {
+				// console.log(textStatus, errorThrown);
+			}
+		});
+	};
+
+	// Save (update) event for Telnyx trunks
+	const eventTelnyxTrunkSave = () => {
+		$('.telnyx_trunk_save').off('click');
+		$('.telnyx_trunk_save').on('click', function (e) {
+			const id = e.target.getAttribute('data-id');
+			const orgid = $('#delete_organization').attr('data-account');
+
+			$('#telnyx_trunk_save_' + id).fadeOut(300);
+			$('#telnyx_trunk_close_updating_' + id).fadeOut(300);
+			$('#telnyx_trunk_name_input_' + id).attr('disabled', true);
+			$('#telnyx_trunk_manage_users_' + id).parent().children('.multiselect-dropdown').css('opacity', '0.5');
+			$('#telnyx_trunk_manage_users_' + id).parent().children('.multiselect-dropdown').css('pointer-events', 'none');
+
+			const name = $('#telnyx_trunk_name_input_' + id).val();
+			const number = $('#telnyx_trunk_number_td_' + id).text().trim();
+			const users = $('#telnyx_trunk_manage_users_' + id).val();
+
+			const data = { orgid, id, name, number, users, service: 'Telnyx' };
+
+			setTimeout(() => {
+				$('#telnyx_trunk_save_loading_' + id).fadeIn(300);
+				$.ajax({
+					url: "/app/ringotel/service.php?method=updateSMSTrunk",
+					type: "post",
+					cache: true,
+					data,
+					success: async function (response) {
+						const parksUserExtensions = await getUsersWithUpdateElements();
+						getTelnyxNumbers(parksUserExtensions);
+						setTimeout(() => {
+							$('#telnyx_trunk_save_loading_' + id).fadeOut(300);
+							$('#telnyx_trunk_delete_' + id).fadeIn(300);
+							$('#telnyx_trunk_update_' + id).fadeIn(300);
+							$('#telnyx_trunk_save_' + id).fadeOut(300);
+							$('#telnyx_trunk_close_updating_' + id).fadeOut(300);
+						}, 300);
+					},
+					error: function (jqXHR, textStatus, errorThrown) {
+						// console.log(textStatus, errorThrown);
+					}
+				});
+			}, 300);
+		});
+	};
+
+	// Close (cancel edit) event for Telnyx trunks
+	const eventTelnyxTrunkClose = () => {
+		$('.telnyx_trunk_close_updating').off('click');
+		$('.telnyx_trunk_close_updating').on('click', function (e) {
+			const id = e.target.getAttribute('data-id');
+
+			$('#telnyx_trunk_delete_' + id).fadeIn(300);
+			$('#telnyx_trunk_update_' + id).fadeIn(300);
+			$('#telnyx_trunk_save_' + id).fadeOut(300);
+			$('#telnyx_trunk_close_updating_' + id).fadeOut(300);
+			$('#telnyx_trunk_name_input_' + id).slideUp(300);
+			$('#telnyx_trunk_manage_users_' + id).parent().children('#multiselect_dropdown').slideUp(300);
+
+			setTimeout(() => {
+				$('#telnyx_trunk_name_h5_' + id).slideDown(300);
+				$('#telnyx_trunk_users_' + id).slideDown(300);
+				$('#telnyx_trunk_manage_users_' + id).parent().children('#multiselect_dropdown').remove();
+			}, 300);
+		});
+	};
+
+	// Edit event for Telnyx trunks
+	const eventTelnyxTrunkUpdate = (users) => {
+		$('.telnyx_trunk_update').off('click');
+		$('.telnyx_trunk_update').on('click', function (e) {
+			const id = e.target.getAttribute('data-id');
+
+			$('#telnyx_trunk_delete_' + id).fadeOut(300);
+			$('#telnyx_trunk_update_' + id).fadeOut(300);
+			$('#telnyx_trunk_save_' + id).fadeIn(300);
+			$('#telnyx_trunk_close_updating_' + id).fadeIn(300);
+			$('#telnyx_trunk_name_input_' + id).attr('disabled', false);
+			$('#telnyx_trunk_users_' + id).parent().children('.multiselect-dropdown').css('opacity', '1');
+			$('#telnyx_trunk_users_' + id).parent().children('.multiselect-dropdown').css('pointer-events', '');
+			$('#telnyx_trunk_name_h5_' + id).slideUp(300);
+			$('#telnyx_trunk_users_' + id).slideUp(300);
+
+			$('#telnyx_trunk_manage_users_' + id).html((users || []).map((item) => {
+				return `<option value="${item?.id}">${item?.name} (${item?.extension})</option>`;
+			}));
+
+			setTimeout(() => {
+				const existing_user_ids = [...$('#telnyx_trunk_users_' + id).children('div')].map((item) => item.getAttribute('data-id'));
+				$('#telnyx_trunk_manage_users_' + id).val(existing_user_ids);
+				$('#telnyx_trunk_name_input_' + id).slideDown(300);
+				$('#telnyx_trunk_manage_users_' + id).parent().children('#multiselect_dropdown').remove();
+				MultiSelectDropDownBindSelectors({ id: 'telnyx_trunk_manage_users_' + id, style: { height: '125px' } });
+			}, 300);
+		});
+	};
+
+	// Delete event for Telnyx trunks
+	const eventTelnyxTrunkDelete = () => {
+		$('.telnyx_trunk_delete').off('click');
+		$('.telnyx_trunk_delete').on('click', function (e) {
+			const id = e.target.getAttribute('data-id');
+			const orgid = $('#delete_organization').attr('data-account');
+			$('#telnyx_trunk_delete_' + id).attr('disabled', true);
+			$.ajax({
+				url: "/app/ringotel/service.php?method=deleteSMSTrunk",
+				type: "post",
+				cache: true,
+				data: { orgid, id },
+				success: function (response) {
+					$('#telnyx_trunk_' + id).slideUp(300);
+				},
+				error: function (jqXHR, textStatus, errorThrown) {
+					// console.log(textStatus, errorThrown);
+				}
+			});
+		});
+	};
+
+	// Add number event (modal form)
+	const eventTelnyxNumberAdd = () => {
+		const checkValid = () => {
+			const number = $('#telnyx_phone_number').val().trim();
+			const users = $('#telnyx_users').val();
+			if (number && users && users.length > 0) {
+				$('#telnyx_save_button').attr('disabled', false);
+			} else {
+				$('#telnyx_save_button').attr('disabled', true);
+			}
+		};
+
+		$('#telnyx_phone_number').off('input').on('input', checkValid);
+		$('#telnyx_users').off('change').on('change', checkValid);
+
+		$('#telnyx_save_button').off('click').on('click', function () {
+			const number = $('#telnyx_phone_number').val().trim();
+			const name = $('#telnyx_display_name').val().trim() || number;
+			const users = $('#telnyx_users').val();
+			const outboundFormat = $('input[name="telnyx_outbound_format"]:checked').val();
+			const inboundFormat = $('input[name="telnyx_inbound_format"]:checked').val();
+			const orgid = $('#delete_organization').attr('data-account');
+
+			if (!number || !users || users.length === 0) return;
+
+			$('#telnyx_save_text').hide();
+			$('#telnyx_save_loading').show();
+			$('#telnyx_save_button').attr('disabled', true);
+
+			const data = { orgid, name, number, users, service: 'Telnyx', outboundFormat, inboundFormat };
+
+			$.ajax({
+				url: "/app/ringotel/service.php?method=createSMSTrunk",
+				type: "post",
+				cache: true,
+				data,
+				success: async function (response) {
+					$('#addTelnyxNumberModal').modal('hide');
+					const parksUserExtensions = await getUsersWithUpdateElements();
+					getTelnyxNumbers(parksUserExtensions);
+				},
+				error: function (jqXHR, textStatus, errorThrown) {
+					// console.log(textStatus, errorThrown);
+				},
+				complete: function () {
+					$('#telnyx_save_text').show();
+					$('#telnyx_save_loading').hide();
+					$('#telnyx_save_button').attr('disabled', false);
+				}
+			});
+		});
+	};
+
+	// Initialize Phone Numbers tab (guarded, runs once)
+	const initPhoneNumbersTab = (parksUserExtensions) => {
+		if (telnyxNumbersLoaded) return;
+		telnyxNumbersLoaded = true;
+
+		$('#telnyx_numbers_container').html(TelnyxNumbersModalelement() + telnyxNumbersHeaderElement());
+
+		// Populate user select from parksUserExtensions
+		const regexp = /[\+*]/;
+		const users = (parksUserExtensions || []).filter((ext) => (!ext.extension.match(regexp) && ext.status === 1)).sort((a, b) => parseInt(a.extension) - parseInt(b.extension));
+		const usersOptionsHtml = (users || []).map((item) => `<option value="${item?.id}">${item?.name} (${item?.extension})</option>`).join('');
+		$('#telnyx_users').html(usersOptionsHtml);
+		$('#telnyx_users').parent().children('#multiselect_dropdown').remove();
+		MultiSelectDropDownBindSelectors({ id: 'telnyx_users' });
+
+		// Reset modal on close
+		$('#addTelnyxNumberModal').on('hidden.bs.modal', function () {
+			$('#telnyx_display_name').val('');
+			$('#telnyx_phone_number').val('');
+			$('#telnyx_users').val([]).trigger('change');
+			$('#telnyx_users').parent().children('#multiselect_dropdown').remove();
+			MultiSelectDropDownBindSelectors({ id: 'telnyx_users' });
+			$('input[name="telnyx_outbound_format"][value="e164"]').prop('checked', true);
+			$('input[name="telnyx_inbound_format"][value="national"]').prop('checked', true);
+			$('#telnyx_save_button').attr('disabled', true);
+		});
+
+		eventTelnyxNumberAdd();
+		getTelnyxNumbers(parksUserExtensions);
+	};
+
 
 	const eventDisableIntegrationFunc = () => {
 		$('#manageNumbersModalDisable').off('click');
@@ -2861,6 +3236,14 @@ echo '</style>';
 			MultiSelectDropDownBindSelectors({ id: 'manage_numbers_users' });
 
 			$('#manage_numbers_activate_button').attr('disabled', false);
+
+			// Also update Telnyx user selector if modal is open
+			if ($('#telnyx_users').length) {
+				const usersOptionsHtml = users?.map((item) => `<option value="${item?.id}">${item?.name} (${item?.extension})</option>`).join('');
+				$('#telnyx_users').html(usersOptionsHtml);
+				$('#telnyx_users').parent().children('#multiselect_dropdown').remove();
+				MultiSelectDropDownBindSelectors({ id: 'telnyx_users' });
+			}
 		} else {
 			// Show Alert Note
 			$('#not_exist_integration_note').fadeIn(300);
@@ -4331,19 +4714,48 @@ echo '</style>';
 
 	// Nav Event Listeners
 
-	const tabSwitcher = () => {
-		$('#nav-org-tab').animate({ width: 'toggle' }, 300);
-		$('#nav-org').animate({ height: 'toggle' }, 300);
+	let currentTab = 'org';
+	let _parksUserExtensionsCache = null;
+
+	const showOrgTab = () => {
+		if ($('#nav-org').is(':hidden')) { $('#nav-org').animate({ height: 'toggle' }, 300); }
+		if ($('#nav-integration').is(':visible')) { $('#nav-integration').animate({ height: 'toggle' }, 300); }
+		if ($('#nav-phonenumbers').is(':visible')) { $('#nav-phonenumbers').animate({ height: 'toggle' }, 300); }
 		setTimeout(() => {
-			$('#nav-org-tab-back').animate({ width: 'toggle' }, 300);
-			$('#nav-integration').animate({ height: 'toggle' }, 300);
+			if ($('#nav-org-tab').is(':hidden')) { $('#nav-org-tab').animate({ width: 'toggle' }, 300); }
+			if ($('#nav-org-tab-back').is(':visible')) { $('#nav-org-tab-back').animate({ width: 'toggle' }, 300); }
 		}, 300);
+		currentTab = 'org';
 	};
-	$('#nav-integration-tab').on('click', (function () {
-		tabSwitcher();
-	}));
-	$('#nav-org-tab-back').on('click', (function () {
-		tabSwitcher();
-	}));
+
+	const showIntegrationTab = () => {
+		if ($('#nav-org').is(':visible')) { $('#nav-org').animate({ height: 'toggle' }, 300); }
+		if ($('#nav-phonenumbers').is(':visible')) { $('#nav-phonenumbers').animate({ height: 'toggle' }, 300); }
+		setTimeout(() => {
+			if ($('#nav-integration').is(':hidden')) { $('#nav-integration').animate({ height: 'toggle' }, 300); }
+			if ($('#nav-org-tab').is(':visible')) { $('#nav-org-tab').animate({ width: 'toggle' }, 300); }
+			if ($('#nav-org-tab-back').is(':hidden')) { $('#nav-org-tab-back').animate({ width: 'toggle' }, 300); }
+		}, 300);
+		currentTab = 'integration';
+	};
+
+	const showPhoneNumbersTab = () => {
+		if ($('#nav-org').is(':visible')) { $('#nav-org').animate({ height: 'toggle' }, 300); }
+		if ($('#nav-integration').is(':visible')) { $('#nav-integration').animate({ height: 'toggle' }, 300); }
+		setTimeout(async () => {
+			if ($('#nav-phonenumbers').is(':hidden')) { $('#nav-phonenumbers').animate({ height: 'toggle' }, 300); }
+			if ($('#nav-org-tab').is(':visible')) { $('#nav-org-tab').animate({ width: 'toggle' }, 300); }
+			if ($('#nav-org-tab-back').is(':hidden')) { $('#nav-org-tab-back').animate({ width: 'toggle' }, 300); }
+			if (!_parksUserExtensionsCache) {
+				_parksUserExtensionsCache = await getUsersWithUpdateElements();
+			}
+			initPhoneNumbersTab(_parksUserExtensionsCache);
+		}, 300);
+		currentTab = 'phonenumbers';
+	};
+
+	$('#nav-integration-tab').on('click', function () { if (currentTab !== 'integration') { showIntegrationTab(); } });
+	$('#nav-phonenumbers-tab').on('click', function () { if (currentTab !== 'phonenumbers') { showPhoneNumbersTab(); } });
+	$('#nav-org-tab-back').on('click', function () { showOrgTab(); });
 
 </script>
