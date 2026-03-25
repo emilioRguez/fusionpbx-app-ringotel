@@ -494,24 +494,19 @@ class RingotelApiFunctions
     // Create Numbers Configuration
     public function createSMSTrunk($param)
     {
-        $service        = isset($param['service'])        ? $param['service']        : 'Bandwidth';
-        $outboundFormat = isset($param['outboundFormat']) ? $param['outboundFormat'] : 'e164';
-        $inboundFormat  = isset($param['inboundFormat'])  ? $param['inboundFormat']  : 'national';
-        $number         = ($service === 'Bandwidth') ? '+1' . $param['number'] : $param['number'];
-
         $parameters = array(
             "method" => "createSMSTrunk",
             "params" => array(
                 "orgid" => $param['orgid'],
                 "name" => $param['name'],
-                "number" => $number,
-                "service" => $service,
+                "number" => '+1'.$param['number'],
+                "service" => "Bandwidth",
                 "users" => $param['users'],
                 "sessionTimeout" => 0,
                 "country" => "US",
                 "groupmode" => true,
-                "outboundFormat" => $outboundFormat,
-                "inboundFormat" => $inboundFormat,
+                "outboundFormat" => "e164",
+                "inboundFormat" => "national",
                 "optout" => array(
                     "keyword" => "STOP",
                     "autoreply" => "You have been removed from our list and will no longer receive messages. To resubscribe, send any message back."
@@ -538,20 +533,15 @@ class RingotelApiFunctions
     // Update Numbers Configuration
     public function updateSMSTrunk($param)
     {
-        $service        = isset($param['service'])        ? $param['service']        : 'Bandwidth';
-        $outboundFormat = isset($param['outboundFormat']) ? $param['outboundFormat'] : 'e164';
-        $inboundFormat  = isset($param['inboundFormat'])  ? $param['inboundFormat']  : 'national';
-        $number         = ($service === 'Bandwidth') ? '+1' . $param['number'] : $param['number'];
-
         $parameters = array(
             "method" => "updateSMSTrunk",
             "params" => array(
                 "orgid" => $param['orgid'],
                 "country" => "US",
-                "inboundFormat" => $inboundFormat,
+                "inboundFormat" => "national",
                 "groupmode" => true,
                 "created" => floor(microtime(true) * 1000),
-                "outboundFormat" => $outboundFormat,
+                "outboundFormat" => "e164",
                 "users" => $param['users'],
                 "autoreply" => array(
                     0 => array(
@@ -563,8 +553,8 @@ class RingotelApiFunctions
                     "autoreply" => "You have been removed from our list and will no longer receive messages. To resubscribe, send any message back.",
                     "keyword" => "STOP"
                 ),
-                "number" => $number,
-                "service" => $service,
+                "number" => '+1'.$param['number'],
+                "service" => "Bandwidth",
                 "name" => $param['name'],
                 "sessionTimeout" => 0,
                 "id" => $param['id'],
